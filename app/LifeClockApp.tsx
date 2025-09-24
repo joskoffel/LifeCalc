@@ -136,19 +136,50 @@ export default function LifeClockApp() {
     if (safeDay !== dobDay) setDobDay(safeDay)
     const mm = String(dobMonth).padStart(2, '0')
     const dd = String(safeDay).padStart(2, '0')
-    setDobStr(`${dobYear}-${mm}-${dd}`)
-  }, [dobYear, dobMonth, dobDay])
-
-  // If dobStr was prefilled (e.g., from URL), hydrate Y/M/D once on mount
-  useEffect(() => {
-    if (!dobStr) return
-    const parts = dobStr.split('-')
-    if (parts.length === 3) {
-      setDobYear(Number(parts[0]))
-      setDobMonth(Number(parts[1]))
-      setDobDay(Number(parts[2]))
+    const nextDob = `${dobYear}-${mm}-${dd}`
+    if (nextDob !== dobStr) {
+      setDobStr(nextDob)
     }
-    // run once on mount also to execute self-tests
+  }, [dobYear, dobMonth, dobDay, dobStr])
+
+  // Hydrate from URL params (if available) and run self-tests once on mount
+  useEffect(() => {
+    const applyDobFromParam = (value: string) => {
+      const parts = value.split('-')
+      if (parts.length !== 3) return
+      const [yearStr, monthStr, dayStr] = parts
+      const year = Number(yearStr)
+      const month = Number(monthStr)
+      const day = Number(dayStr)
+      if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) return
+      const currentYear = new Date().getFullYear()
+      const safeYear = clamp(year, 1900, currentYear)
+      const safeMonth = clamp(month, 1, 12)
+      const safeDay = clamp(day, 1, daysInMonth(safeYear, safeMonth))
+      const mm = String(safeMonth).padStart(2, '0')
+      const dd = String(safeDay).padStart(2, '0')
+      const nextDob = `${safeYear}-${mm}-${dd}`
+      setDobYear(safeYear)
+      setDobMonth(safeMonth)
+      setDobDay(safeDay)
+      setDobStr(nextDob)
+    }
+
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const dobParam = params.get('dob')
+      if (dobParam) {
+        applyDobFromParam(dobParam)
+      }
+      const expParam = params.get('exp')
+      if (expParam) {
+        const parsed = Number(expParam)
+        if (!Number.isNaN(parsed)) {
+          setExpYears(clamp(parsed, 30, 120))
+        }
+      }
+    }
+
     runSelfTests()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -183,7 +214,9 @@ export default function LifeClockApp() {
     const p = new URLSearchParams()
     if (dobStr) p.set('dob', dobStr)
     if (expYears) p.set('exp', String(expYears))
-    const url = `${window.location.origin}${window.location.pathname}?${p.toString()}`
+    const query = p.toString()
+    const base = `${window.location.origin}${window.location.pathname}`
+    const url = query ? `${base}?${query}` : base
     if (navigator?.clipboard?.writeText) {
       navigator.clipboard.writeText(url).then(() => {
         alert('URL skopírované do schránky.')
