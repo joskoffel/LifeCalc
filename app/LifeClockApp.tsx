@@ -128,7 +128,7 @@ export default function LifeClockApp() {
   const [dobMonth, setDobMonth] = useState<number>(1)
   const [dobDay, setDobDay] = useState<number>(1)
 
-  const expYears = 82
+  const [expYears, setExpYears] = useState<number>(82)
 
   const years = useMemo(() => {
     const out: number[] = []
@@ -376,9 +376,21 @@ export default function LifeClockApp() {
 
         <div className={`w-full max-w-4xl transition-all duration-700 ease-out ${showDetails ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 translate-y-3'} lg:max-w-sm lg:self-stretch lg:pt-6`}>
           <div className="flex h-full flex-col gap-6 rounded-[28px] border border-emerald-500/15 bg-white/70 p-6 shadow-2xl backdrop-blur-xl dark:border-emerald-400/15 dark:bg-slate-900/60 sm:p-8">
-            <div className="flex flex-col gap-1 text-left">
-              <span className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-700 dark:text-emerald-200">Očakávaná dĺžka života</span>
-              <span className="text-lg font-semibold text-emerald-600 dark:text-emerald-300">{expYears.toFixed(0)} rokov</span>
+            <div className="flex flex-col gap-3 text-left sm:flex-row sm:items-center sm:justify-between">
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                Očakávaná dĺžka života:
+                {' '}
+                <span className="font-semibold text-emerald-600 dark:text-emerald-300">{expYears.toFixed(0)} rokov</span>
+              </label>
+              <input
+                type="range"
+                min={30}
+                max={120}
+                step={1}
+                value={expYears}
+                onChange={(e) => setExpYears(clamp(Number(e.target.value), 30, 120))}
+                className="h-2 w-full max-w-sm cursor-pointer appearance-none rounded-full bg-emerald-200/60 accent-emerald-500 dark:bg-emerald-500/30"
+              />
             </div>
 
             <div className="grid grid-cols-1 gap-4 text-left sm:grid-cols-2">
