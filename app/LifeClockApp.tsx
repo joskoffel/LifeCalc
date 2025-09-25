@@ -120,6 +120,7 @@ export default function LifeClockApp() {
   const [dobYear, setDobYear] = useState<number>(1999)
   const [dobMonth, setDobMonth] = useState<number>(1)
   const [dobDay, setDobDay] = useState<number>(1)
+  const [expYears, setExpYears] = useState<number>(82)
   const years = useMemo(() => {
     const out: number[] = []
     const current = new Date().getFullYear()
@@ -163,6 +164,7 @@ export default function LifeClockApp() {
       setDobMonth(safeMonth)
       setDobDay(safeDay)
       setDobStr(nextDob)
+      setHasInteractedWithDob(true)
     }
 
     if (typeof window !== 'undefined') {
@@ -184,7 +186,24 @@ export default function LifeClockApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const [expYears, setExpYears] = useState<number>(82)
+  const [hasInteractedWithDob, setHasInteractedWithDob] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
+  const [visibleWeeks, setVisibleWeeks] = useState(0)
+  const visibleWeeksRef = useRef(0)
+
+  useEffect(() => {
+    visibleWeeksRef.current = visibleWeeks
+  }, [visibleWeeks])
+
+  const markDobInteraction = () => {
+    setHasInteractedWithDob(true)
+  }
+
+  useEffect(() => {
+    if (!hasInteractedWithDob || !dobStr) return
+    const timeout = window.setTimeout(() => setShowDetails(true), 200)
+    return () => window.clearTimeout(timeout)
+  }, [hasInteractedWithDob, dobStr])
 
   // Live time ticker
   const [now, setNow] = useState<Date>(() => new Date())
@@ -207,6 +226,42 @@ export default function LifeClockApp() {
     if (Number.isNaN(dobDate.getTime())) return null
     return computeLifeStats(dobDate, now, expYears)
   }, [dobStr, now, expYears])
+
+  const totalWeeks = stats?.totalWeeks ?? 0
+  const targetWeeks = stats ? clamp(stats.livedWeeks, 0, totalWeeks) : 0
+
+  useEffect(() => {
+    if (!showDetails) return
+    setVisibleWeeks(0)
+  }, [showDetails, dobStr, expYears])
+
+  useEffect(() => {
+    if (!showDetails || totalWeeks <= 0) return
+    const target = targetWeeks
+    const startValue = clamp(visibleWeeksRef.current, 0, totalWeeks)
+    if (target === startValue) return
+
+    const duration = Math.min(4000, Math.max(1200, totalWeeks * 6))
+    let startTime: number | null = null
+    let raf: number
+
+    const step = (timestamp: number) => {
+      if (startTime === null) startTime = timestamp
+      const progress = Math.min(1, (timestamp - startTime) / duration)
+      const interpolated = Math.round(startValue + (target - startValue) * progress)
+      if (progress >= 1) {
+        setVisibleWeeks(target)
+      } else {
+        setVisibleWeeks(interpolated)
+      }
+      if (progress < 1) {
+        raf = requestAnimationFrame(step)
+      }
+    }
+
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [showDetails, targetWeeks, totalWeeks])
 
   // Share URL (embeds dob & expectancy)
   const shareUrl = () => {
@@ -237,6 +292,9 @@ export default function LifeClockApp() {
   const fmtPct = (n: number | undefined) =>
     typeof n === 'number' ? `${n.toFixed(2)}%` : '—'
 
+  const progressWidth = showDetails && stats ? `${stats.percent}%` : '0%'
+  const displayedLivedWeeks = showDetails ? clamp(visibleWeeks, 0, totalWeeks) : 0
+
   return (
     <div className="min-h-screen w-full bg-slate-50 text-slate-900 p-6 md:p-10">
       <div className="max-w-5xl mx-auto">
@@ -250,22 +308,22 @@ export default function LifeClockApp() {
             <div>
               <label className="block text-sm text-slate-600 mb-1">Dátum narodenia</label>
               <div className="grid grid-cols-3 gap-2">
-                <select aria-label="Rok narodenia" className="rounded-xl border border-slate-200 px-3 py-2 hover:border-slate-300 transition-colors" value={dobYear} onChange={(e) => setDobYear(Number(e.target.value))}>
+                <select aria-label="Rok narodenia" className="rounded-xl border border-slate-200 px-3 py-2 hover:border-slate-300 transition-colors" value={dobYear} onChange={(e) => { markDobInteraction(); setDobYear(Number(e.target.value)); }}>
                   {years.map((y) => (<option key={y} value={y}>{y}</option>))}
                 </select>
-                <select aria-label="Mesiac" className="rounded-xl border border-slate-200 px-3 py-2 hover:border-slate-300 transition-colors" value={dobMonth} onChange={(e) => setDobMonth(Number(e.target.value))}>
+                <select aria-label="Mesiac" className="rounded-xl border border-slate-200 px-3 py-2 hover:border-slate-300 transition-colors" value={dobMonth} onChange={(e) => { markDobInteraction(); setDobMonth(Number(e.target.value)); }}>
                   {months.map((m) => (<option key={m} value={m}>{String(m).padStart(2,'0')}</option>))}
                 </select>
-                <select aria-label="Deň" className="rounded-xl border border-slate-200 px-3 py-2 hover:border-slate-300 transition-colors" value={dobDay} onChange={(e) => setDobDay(Number(e.target.value))}>
+                <select aria-label="Deň" className="rounded-xl border border-slate-200 px-3 py-2 hover:border-slate-300 transition-colors" value={dobDay} onChange={(e) => { markDobInteraction(); setDobDay(Number(e.target.value)); }}>
                   {Array.from({ length: daysInMonth(dobYear, dobMonth) }, (_, i) => i + 1).map((d) => (<option key={d} value={d}>{String(d).padStart(2,'0')}</option>))}
                 </select>
               </div>
               <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
                 <span>Rýchly skok na rok:</span>
                 {[2000, 1995, 1990, 1985, 1980, 1975].map((y) => (
-                  <button key={y} type="button" className="rounded-lg px-2 py-1 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 transition-colors" onClick={() => setDobYear(y)}>{y}</button>
+                  <button key={y} type="button" className="rounded-lg px-2 py-1 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 transition-colors" onClick={() => { markDobInteraction(); setDobYear(y); }}>{y}</button>
                 ))}
-                <button type="button" className="rounded-lg px-2 py-1 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 transition-colors" onClick={() => { const y = new Date().getFullYear(); setDobYear(y); setDobMonth(1); setDobDay(1); }}>Dnešný rok</button>
+                <button type="button" className="rounded-lg px-2 py-1 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 transition-colors" onClick={() => { const y = new Date().getFullYear(); markDobInteraction(); setDobYear(y); setDobMonth(1); setDobDay(1); }}>Dnešný rok</button>
               </div>
               <p className="text-xs text-slate-500 mt-1">Tip: vyber najprv rok, potom mesiac a deň; dátum ukladáme ako {dobStr || '—'}.</p>
             </div>
@@ -313,67 +371,71 @@ export default function LifeClockApp() {
           </div>
         </section>
 
-        <section className="grid md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-2xl shadow p-5">
-            <div className="text-sm text-slate-600">Vek</div>
-            <div className="text-3xl font-bold tabular-nums">{stats ? stats.ageYears.toFixed(2) : '—'}</div>
-          </div>
-          <div className="bg-white rounded-2xl shadow p-5">
-            <div className="text-sm text-slate-600">Zostáva (roky)</div>
-            <div className="text-3xl font-bold tabular-nums">{stats ? stats.leftYears.toFixed(2) : '—'}</div>
-          </div>
-          <div className="bg-white rounded-2xl shadow p-5">
-            <div className="text-sm text-slate-600">% prežité</div>
-            <div className="text-3xl font-bold tabular-nums">{stats ? fmtPct(stats.percent) : '—'}</div>
-          </div>
-          <div className="bg-white rounded-2xl shadow p-5">
-            <div className="text-sm text-slate-600">Live odpočítavanie</div>
-            <div className="text-xl font-semibold tabular-nums">
-              {stats
-                ? `${Math.floor(stats.leftYears)}r ${stats.leftParts.days % 365}d ${stats.leftParts.hours}h ${stats.leftParts.minutes}m ${stats.leftParts.seconds}s`
-                : '—'}
-            </div>
-            <div className="text-xs text-slate-500 mt-1">Roky • dni • hodiny • minúty • sekundy</div>
-          </div>
-        </section>
+        {showDetails && (
+          <>
+            <section className="grid md:grid-cols-4 gap-4 mb-6 life-fade-section" style={{ animationDelay: '0ms' }}>
+              <div className="bg-white rounded-2xl shadow p-5">
+                <div className="text-sm text-slate-600">Vek</div>
+                <div className="text-3xl font-bold tabular-nums">{stats ? stats.ageYears.toFixed(2) : '—'}</div>
+              </div>
+              <div className="bg-white rounded-2xl shadow p-5">
+                <div className="text-sm text-slate-600">Zostáva (roky)</div>
+                <div className="text-3xl font-bold tabular-nums">{stats ? stats.leftYears.toFixed(2) : '—'}</div>
+              </div>
+              <div className="bg-white rounded-2xl shadow p-5">
+                <div className="text-sm text-slate-600">% prežité</div>
+                <div className="text-3xl font-bold tabular-nums">{stats ? fmtPct(stats.percent) : '—'}</div>
+              </div>
+              <div className="bg-white rounded-2xl shadow p-5">
+                <div className="text-sm text-slate-600">Live odpočítavanie</div>
+                <div className="text-xl font-semibold tabular-nums">
+                  {stats
+                    ? `${Math.floor(stats.leftYears)}r ${stats.leftParts.days % 365}d ${stats.leftParts.hours}h ${stats.leftParts.minutes}m ${stats.leftParts.seconds}s`
+                    : '—'}
+                </div>
+                <div className="text-xs text-slate-500 mt-1">Roky • dni • hodiny • minúty • sekundy</div>
+              </div>
+            </section>
 
-        <section className="bg-white rounded-2xl shadow p-6 mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-sm text-slate-600">Životný progres</div>
-            <div className="text-sm font-medium">{stats ? `${stats.percent.toFixed(2)}% prežité` : '—'}</div>
-          </div>
-          <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-4 bg-emerald-600" style={{ width: stats ? `${stats.percent}%` : '0%' }} />
-          </div>
-        </section>
+            <section className="bg-white rounded-2xl shadow p-6 mb-6 life-fade-section" style={{ animationDelay: '150ms' }}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm text-slate-600">Životný progres</div>
+                <div className="text-sm font-medium">{stats ? `${stats.percent.toFixed(2)}% prežité` : '—'}</div>
+              </div>
+              <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-4 bg-emerald-600 transition-all duration-[2000ms] ease-out" style={{ width: progressWidth }} />
+              </div>
+            </section>
 
-        {/* Týždne života (vizualizácia) */}
-        <section className="bg-white rounded-2xl shadow p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <div className="text-sm text-slate-600">Týždne života</div>
-              <div className="text-xs text-slate-500">Každý štvorček je 1 týždeň. 52 stĺpcov = 1 rok.</div>
-            </div>
-            <div className="text-sm font-medium">
-              {stats ? `${stats.livedWeeks.toLocaleString('sk-SK')} / ${stats.totalWeeks.toLocaleString('sk-SK')} týždňov` : '—'}
-            </div>
-          </div>
+            {/* Týždne života (vizualizácia) */}
+            <section className="bg-white rounded-2xl shadow p-6 mb-6 life-fade-section" style={{ animationDelay: '300ms' }}>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <div className="text-sm text-slate-600">Týždne života</div>
+                  <div className="text-xs text-slate-500">Každý štvorček je 1 týždeň. 52 stĺpcov = 1 rok.</div>
+                </div>
+                <div className="text-sm font-medium">
+                  {stats ? `${stats.livedWeeks.toLocaleString('sk-SK')} / ${stats.totalWeeks.toLocaleString('sk-SK')} týždňov` : '—'}
+                </div>
+              </div>
 
-          <div className="grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(52, minmax(0,1fr))', gap: 2 }}>
-            {stats && Array.from({ length: stats.totalWeeks }).map((_, i) => (
-              <div
-                key={i}
-                className={'w-full rounded-[2px]' + (i < stats.livedWeeks ? ' bg-emerald-600' : ' bg-slate-200 border border-slate-300')}
-                style={{ paddingTop: '100%' }}
-              />
-            ))}
-          </div>
+              <div className="grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(52, minmax(0,1fr))', gap: 2 }}>
+                {stats && Array.from({ length: stats.totalWeeks }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`life-week w-full rounded-[2px] ${i < displayedLivedWeeks ? 'life-week--filled' : 'life-week--empty'}`}
+                    style={{ paddingTop: '100%' }}
+                  />
+                ))}
+              </div>
 
-          <div className="flex items-center gap-3 mt-4 text-xs text-slate-600">
-            <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-emerald-600" /> prežité</div>
-            <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-slate-200 border border-slate-300" /> zostáva</div>
-          </div>
-        </section>
+              <div className="flex items-center gap-3 mt-4 text-xs text-slate-600">
+                <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-emerald-600" /> prežité</div>
+                <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-slate-200 border border-slate-300" /> zostáva</div>
+              </div>
+            </section>
+          </>
+        )}
       </div>
     </div>
   )
