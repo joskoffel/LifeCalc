@@ -15,11 +15,11 @@ body {
   opacity: 0;
   transform: scale(0.92);
   transition:
-    opacity 1.2s ease,
-    transform 1.2s ease,
-    background-color 0.8s ease,
-    border-color 0.8s ease,
-    box-shadow 0.8s ease;
+    opacity 0.7s ease,
+    transform 0.7s ease,
+    background-color 0.5s ease,
+    border-color 0.5s ease,
+    box-shadow 0.5s ease;
 }
 
 .life-week--slot-visible {
@@ -51,7 +51,7 @@ body {
 
 .life-grid-wrapper {
   opacity: 0;
-  transition: opacity 1.4s ease;
+  transition: opacity 0.9s ease;
 }
 
 .life-grid--revealing {
@@ -60,7 +60,7 @@ body {
 
 .life-grid {
   opacity: 0;
-  transition: opacity 1.4s ease;
+  transition: opacity 0.9s ease;
 }
 
 .life-grid--revealing .life-grid,
