@@ -189,7 +189,16 @@ export default function LifeClockApp() {
   const [prepPhase, setPrepPhase] = useState<'hidden' | 'in' | 'out'>('hidden')
   useEffect(() => {
     if (currentStep !== 'prep') {
-      setPrepPhase('hidden')
+      if (currentStep === 'visual' && prepPhase === 'out') {
+        const hideTimer = window.setTimeout(() => setPrepPhase('hidden'), 600)
+        return () => window.clearTimeout(hideTimer)
+      }
+      if (currentStep === 'visual' && prepPhase !== 'hidden') {
+        setPrepPhase('hidden')
+      }
+      if (currentStep !== 'visual' && prepPhase !== 'hidden') {
+        setPrepPhase('hidden')
+      }
       return
     }
     setPrepPhase('in')
@@ -201,7 +210,7 @@ export default function LifeClockApp() {
       window.clearTimeout(fadeOutTimer)
       window.clearTimeout(proceedTimer)
     }
-  }, [currentStep, goToStep])
+  }, [currentStep, goToStep, prepPhase])
 
   // Live time ticker
   const [now, setNow] = useState<Date>(() => new Date())
@@ -224,8 +233,8 @@ export default function LifeClockApp() {
     return computeLifeStats(dobDate, now, expYears)
   }, [dobStr, now, expYears])
 
-  const isVisualStep = currentStep === 'visual'
-  const showDetails = isVisualStep && !!stats
+  const isVisualStage = currentStep === 'visual' || currentStep === 'prep'
+  const showDetails = isVisualStage && !!stats
 
   const [gridPhase, setGridPhase] = useState<'hidden' | 'revealing' | 'ready'>('hidden')
   useEffect(() => {
@@ -302,7 +311,7 @@ export default function LifeClockApp() {
 
   const toggleDarkMode = () => setIsDarkMode(v => !v)
 
-  const stepCardBase = isVisualStep
+  const stepCardBase = isVisualStage
     ? 'w-full max-w-5xl rounded-[32px] bg-white/75 px-6 py-8 shadow-2xl backdrop-blur-xl dark:bg-slate-900/60 sm:px-10 sm:py-10'
     : 'w-full max-w-xl rounded-[32px] bg-white/75 p-8 shadow-2xl backdrop-blur-xl dark:bg-slate-900/60 sm:p-10'
 
@@ -312,12 +321,140 @@ export default function LifeClockApp() {
       ? 'opacity-0 translate-y-4'
       : 'opacity-100 translate-y-0'
 
-  const introState = isVisualStep
+  const introState = isVisualStage
     ? 'pointer-events-none opacity-0 -translate-y-4'
     : 'opacity-100 translate-y-0'
 
+  const formattedDob = dobStr ? new Date(dobStr).toLocaleDateString('sk-SK') : '—'
+
+  const renderVisualContent = (isPrepping: boolean) => {
+    const overlayVisible = prepPhase !== 'hidden'
+    const overlayOpacity = prepPhase === 'in' ? 'opacity-100' : 'opacity-0'
+    const overlayPointer = prepPhase === 'out' && !isPrepping ? 'pointer-events-none' : 'pointer-events-auto'
+    return (
+      <div className="relative flex w-full max-w-6xl flex-col items-center gap-10 text-center lg:flex-row lg:items-start lg:justify-center lg:gap-14 lg:text-left">
+        <div className="flex w-full flex-col items-center gap-8 lg:flex-1 lg:items-start">
+          <div className="flex flex-col items-center gap-3 lg:items-start">
+            <span className="text-xs font-semibold uppercase tracking-[0.6em] text-emerald-500 dark:text-emerald-300/80">Život na jednej obrazovke</span>
+            <h2 className="text-3xl font-semibold sm:text-4xl">Tvoje zelené týždne</h2>
+            <p className="max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+              {dobStr ? `Narodený ${formattedDob} • očakávanie ${expYears.toFixed(0)} rokov` : 'Zadaj dátum a sleduj vizualizáciu života.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => goToStep('year')}
+              className="text-sm font-semibold text-emerald-600 transition-colors duration-500 hover:text-emerald-500 dark:text-emerald-300"
+            >
+              Zmeniť dátum
+            </button>
+          </div>
+
+          <div className={`flex w-full flex-col items-center gap-8 transition-all duration-700 ease-out ${showDetails ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 translate-y-2'} lg:items-start`}>
+            <div className="flex w-full max-w-4xl flex-col items-center gap-5 lg:max-w-none lg:items-start lg:text-left">
+              <div className="h-3 w-full overflow-hidden rounded-full bg-emerald-100/50 dark:bg-emerald-500/20">
+                <div className="h-3 rounded-full bg-emerald-500 transition-all duration-[1600ms] ease-out dark:bg-emerald-400" style={{ width: progressWidth }} />
+              </div>
+              <div
+                className={`life-grid-wrapper w-full rounded-[24px] border border-emerald-500/15 bg-white/60 p-4 shadow-inner backdrop-blur-sm transition-all duration-700 ease-out dark:border-emerald-400/20 dark:bg-slate-900/50 ${gridPhase !== 'hidden' ? 'life-grid--revealing' : ''} ${gridPhase === 'ready' ? 'life-grid--ready' : ''}`}
+                style={{ minHeight: '320px' }}
+              >
+                <div className="life-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(52, minmax(0,1fr))', gap: 2 }}>
+                  {stats && Array.from({ length: stats.totalWeeks }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`life-week w-full rounded-[4px] ${gridPhase !== 'hidden' ? 'life-week--slot-visible' : ''}${i < displayedLivedWeeks ? 'life-week--filled' : 'life-week--empty'}`}
+                      style={{ paddingTop: '45%' }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs uppercase tracking-[0.4em] text-slate-500 dark:text-slate-400 lg:text-left">Každý slot = 1 týždeň života</p>
+            </div>
+          </div>
+        </div>
+
+        <div className={`w-full max-w-4xl transition-all duration-700 ease-out ${showDetails ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 translate-y-3'} lg:max-w-sm lg:self-stretch lg:pt-6`}>
+          <div className="flex h-full flex-col gap-6 rounded-[28px] border border-emerald-500/15 bg-white/70 p-6 shadow-2xl backdrop-blur-xl dark:border-emerald-400/15 dark:bg-slate-900/60 sm:p-8">
+            <div className="flex flex-col gap-3 text-left sm:flex-row sm:items-center sm:justify-between">
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                Očakávaná dĺžka života:{' '}
+                <span className="font-semibold text-emerald-600 dark:text-emerald-300">{expYears.toFixed(0)} rokov</span>
+              </label>
+              <input
+                type="range"
+                min={30}
+                max={120}
+                step={1}
+                value={expYears}
+                onChange={(e) => setExpYears(clamp(Number(e.target.value), 30, 120))}
+                className="h-2 w-full max-w-sm cursor-pointer appearance-none rounded-full bg-emerald-200/60 accent-emerald-500 dark:bg-emerald-500/30"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 text-left sm:grid-cols-2">
+              <div className="rounded-2xl bg-emerald-500/10 p-4 shadow-inner dark:bg-emerald-500/15">
+                <div className="text-xs uppercase tracking-[0.3em] text-emerald-700 dark:text-emerald-200">Vek</div>
+                <div className="mt-2 text-2xl font-semibold tabular-nums">
+                  {stats ? `${stats.ageYears.toFixed(2)} r` : '—'}
+                </div>
+              </div>
+              <div className="rounded-2xl bg-emerald-500/10 p-4 shadow-inner dark:bg-emerald-500/15">
+                <div className="text-xs uppercase tracking-[0.3em] text-emerald-700 dark:text-emerald-200">Zostáva</div>
+                <div className="mt-2 text-2xl font-semibold tabular-nums">
+                  {stats ? `${stats.leftYears.toFixed(2)} r` : '—'}
+                </div>
+              </div>
+              <div className="rounded-2xl bg-emerald-500/10 p-4 shadow-inner dark:bg-emerald-500/15">
+                <div className="text-xs uppercase tracking-[0.3em] text-emerald-700 dark:text-emerald-200">% prežité</div>
+                <div className="mt-2 text-2xl font-semibold tabular-nums">
+                  {stats ? fmtPct(stats.percent) : '—'}
+                </div>
+              </div>
+              <div className="rounded-2xl bg-emerald-500/10 p-4 shadow-inner dark:bg-emerald-500/15">
+                <div className="text-xs uppercase tracking-[0.3em] text-emerald-700 dark:text-emerald-200">Live odpočítavanie</div>
+                <div className="mt-2 text-base font-semibold tabular-nums">
+                  {stats
+                    ? `${Math.floor(stats.leftYears)}r ${stats.leftParts.days % 365}d ${stats.leftParts.hours}h ${stats.leftParts.minutes}m ${stats.leftParts.seconds}s`
+                    : '—'}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 text-sm text-slate-600 dark:text-slate-300">
+              <p>
+                Prežité týždne:{' '}
+                <strong>{stats ? fmtInt(stats.livedWeeks) : '—'} / {stats ? fmtInt(stats.totalWeeks) : '—'}</strong>
+              </p>
+              <p>
+                Zelené bodky reprezentujú každý týždeň života. Sleduj, ako sa plnia – pomaly, vytrvalo a na jednom mieste.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {overlayVisible && (
+          <div
+            className={`absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 rounded-[32px] bg-white/85 px-6 text-center transition-opacity duration-[1400ms] ease-out backdrop-blur-2xl dark:bg-slate-950/80 sm:px-10 ${overlayOpacity} ${overlayPointer}`}
+          >
+            <span className="text-4xl font-semibold uppercase tracking-[0.65em] text-emerald-600 dark:text-emerald-300">
+              Priprav sa
+            </span>
+            <p className="max-w-sm text-sm text-slate-600 dark:text-slate-300">
+              Tvoje údaje spracúvame a zapĺňame prvé zelené bodky. Pomalý nádych, výdych – o chvíľu uvidíš celý obraz.
+            </p>
+            {isPrepping && (
+              <div className="mt-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.35em] text-emerald-500 dark:text-emerald-300">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500 dark:bg-emerald-300" />
+                Loading
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const renderStep = (step: Step) => {
-    const formattedDob = dobStr ? new Date(dobStr).toLocaleDateString('sk-SK') : '—'
     switch (step) {
       case 'year':
         return (
@@ -416,124 +553,9 @@ export default function LifeClockApp() {
           </div>
         )
       case 'prep':
-        return (
-          <div className="flex min-h-[200px] flex-col items-center justify-center gap-4 text-center">
-            <span
-              className={`text-4xl font-semibold uppercase tracking-[0.65em] text-emerald-600 transition-opacity duration-[2200ms] ease-out dark:text-emerald-300 ${prepPhase === 'in' ? 'opacity-100' : 'opacity-0'}`}
-            >
-              Priprav sa
-            </span>
-            <p
-              className={`text-sm text-slate-600 transition-opacity duration-[2200ms] ease-out dark:text-slate-300 ${prepPhase === 'out' ? 'opacity-0' : 'opacity-100'}`}
-            >
-              Zelené bodky sa prebúdzajú a plnia jeden týždeň po druhom.
-            </p>
-          </div>
-        )
+        return renderVisualContent(true)
       case 'visual':
-        return (
-          <div className="flex w-full max-w-6xl flex-col items-center gap-10 text-center lg:flex-row lg:items-start lg:justify-center lg:gap-14 lg:text-left">
-            <div className="flex w-full flex-col items-center gap-8 lg:flex-1 lg:items-start">
-              <div className="flex flex-col items-center gap-3 lg:items-start">
-                <span className="text-xs font-semibold uppercase tracking-[0.6em] text-emerald-500 dark:text-emerald-300/80">Život na jednej obrazovke</span>
-                <h2 className="text-3xl font-semibold sm:text-4xl">Tvoje zelené týždne</h2>
-                <p className="max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-                  {dobStr ? `Narodený ${formattedDob} • očakávanie ${expYears.toFixed(0)} rokov` : 'Zadaj dátum a sleduj vizualizáciu života.'}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => goToStep('year')}
-                  className="text-sm font-semibold text-emerald-600 transition-colors duration-500 hover:text-emerald-500 dark:text-emerald-300"
-                >
-                  Zmeniť dátum
-                </button>
-              </div>
-
-              <div className={`flex w-full flex-col items-center gap-8 transition-all duration-700 ease-out ${showDetails ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 translate-y-2'} lg:items-start`}>
-                <div className="flex w-full max-w-4xl flex-col items-center gap-5 lg:max-w-none lg:items-start lg:text-left">
-                  <div className="h-3 w-full overflow-hidden rounded-full bg-emerald-100/50 dark:bg-emerald-500/20">
-                    <div className="h-3 rounded-full bg-emerald-500 transition-all duration-[1600ms] ease-out dark:bg-emerald-400" style={{ width: progressWidth }} />
-                  </div>
-                  <div
-                    className={`life-grid-wrapper w-full rounded-[24px] border border-emerald-500/15 bg-white/60 p-4 shadow-inner backdrop-blur-sm transition-all duration-700 ease-out dark:border-emerald-400/20 dark:bg-slate-900/50 ${gridPhase !== 'hidden' ? 'life-grid--revealing' : ''} ${gridPhase === 'ready' ? 'life-grid--ready' : ''}`}
-                    style={{ minHeight: '320px' }}
-                  >
-                    <div className="life-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(52, minmax(0,1fr))', gap: 2 }}>
-                      {stats && Array.from({ length: stats.totalWeeks }).map((_, i) => (
-                        <div
-                          key={i}
-                          className={`life-week w-full rounded-[4px] ${gridPhase !== 'hidden' ? 'life-week--slot-visible' : ''} ${i < displayedLivedWeeks ? 'life-week--filled' : 'life-week--empty'}`}
-                          style={{ paddingTop: '45%' }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  <p className="text-xs uppercase tracking-[0.4em] text-slate-500 dark:text-slate-400 lg:text-left">Každý slot = 1 týždeň života</p>
-                </div>
-              </div>
-            </div>
-
-            <div className={`w-full max-w-4xl transition-all duration-700 ease-out ${showDetails ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 translate-y-3'} lg:max-w-sm lg:self-stretch lg:pt-6`}>
-              <div className="flex h-full flex-col gap-6 rounded-[28px] border border-emerald-500/15 bg-white/70 p-6 shadow-2xl backdrop-blur-xl dark:border-emerald-400/15 dark:bg-slate-900/60 sm:p-8">
-                <div className="flex flex-col gap-3 text-left sm:flex-row sm:items-center sm:justify-between">
-                  <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                    Očakávaná dĺžka života:
-                    {' '}
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-300">{expYears.toFixed(0)} rokov</span>
-                  </label>
-                  <input
-                    type="range"
-                    min={30}
-                    max={120}
-                    step={1}
-                    value={expYears}
-                    onChange={(e) => setExpYears(clamp(Number(e.target.value), 30, 120))}
-                    className="h-2 w-full max-w-sm cursor-pointer appearance-none rounded-full bg-emerald-200/60 accent-emerald-500 dark:bg-emerald-500/30"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 text-left sm:grid-cols-2">
-                  <div className="rounded-2xl bg-emerald-500/10 p-4 shadow-inner dark:bg-emerald-500/15">
-                    <div className="text-xs uppercase tracking-[0.3em] text-emerald-700 dark:text-emerald-200">Vek</div>
-                    <div className="mt-2 text-2xl font-semibold tabular-nums">
-                      {stats ? `${stats.ageYears.toFixed(2)} r` : '—'}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl bg-emerald-500/10 p-4 shadow-inner dark:bg-emerald-500/15">
-                    <div className="text-xs uppercase tracking-[0.3em] text-emerald-700 dark:text-emerald-200">Zostáva</div>
-                    <div className="mt-2 text-2xl font-semibold tabular-nums">
-                      {stats ? `${stats.leftYears.toFixed(2)} r` : '—'}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl bg-emerald-500/10 p-4 shadow-inner dark:bg-emerald-500/15">
-                    <div className="text-xs uppercase tracking-[0.3em] text-emerald-700 dark:text-emerald-200">% prežité</div>
-                    <div className="mt-2 text-2xl font-semibold tabular-nums">
-                      {stats ? fmtPct(stats.percent) : '—'}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl bg-emerald-500/10 p-4 shadow-inner dark:bg-emerald-500/15">
-                    <div className="text-xs uppercase tracking-[0.3em] text-emerald-700 dark:text-emerald-200">Live odpočítavanie</div>
-                    <div className="mt-2 text-base font-semibold tabular-nums">
-                      {stats
-                        ? `${Math.floor(stats.leftYears)}r ${stats.leftParts.days % 365}d ${stats.leftParts.hours}h ${stats.leftParts.minutes}m ${stats.leftParts.seconds}s`
-                        : '—'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3 text-sm text-slate-600 dark:text-slate-300">
-                  <p>
-                    Prežité týždne:{' '}
-                    <strong>{stats ? fmtInt(stats.livedWeeks) : '—'} / {stats ? fmtInt(stats.totalWeeks) : '—'}</strong>
-                  </p>
-                  <p>
-                    Zelené bodky reprezentujú každý týždeň života. Sleduj, ako sa plnia – pomaly, vytrvalo a na jednom mieste.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
+        return renderVisualContent(false)
       default:
         return null
     }
@@ -552,7 +574,7 @@ export default function LifeClockApp() {
         </button>
       </div>
 
-      <div className={`relative z-10 flex w-full max-w-6xl flex-col items-center justify-center px-6 py-16 text-center ${isVisualStep ? 'gap-6' : 'gap-8'}`}>
+      <div className={`relative z-10 flex w-full max-w-6xl flex-col items-center justify-center px-6 py-16 text-center ${isVisualStage ? 'gap-6' : 'gap-8'}`}>
         <div className={`flex flex-col items-center gap-4 transition-all duration-700 ease-out ${introState}`}>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Life Clock</h1>
           <p className="max-w-xl text-sm text-slate-600 transition-opacity duration-[1200ms] ease-out dark:text-slate-300">
