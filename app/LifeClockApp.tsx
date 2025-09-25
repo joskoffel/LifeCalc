@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 // === Utility constants ===
 const MS_PER_DAY = 24 * 3600 * 1000
@@ -190,14 +190,39 @@ export default function LifeClockApp() {
   const [showDetails, setShowDetails] = useState(false)
   const [visibleWeeks, setVisibleWeeks] = useState(0)
   const visibleWeeksRef = useRef(0)
+  const detailsSectionRef = useRef<HTMLDivElement | null>(null)
+  const autoFocusTriggeredRef = useRef(false)
 
   useEffect(() => {
     visibleWeeksRef.current = visibleWeeks
   }, [visibleWeeks])
 
+  useEffect(() => {
+    if (showDetails) {
+      autoFocusTriggeredRef.current = false
+    }
+  }, [dobStr, expYears, showDetails])
+
   const markDobInteraction = () => {
     setHasInteractedWithDob(true)
   }
+
+  useEffect(() => {
+    if (!showDetails || autoFocusTriggeredRef.current) return
+    if (typeof window === 'undefined') return
+    const el = detailsSectionRef.current
+    if (!el) return
+    const isSmallScreen = window.matchMedia('(max-width: 767px)').matches
+    if (!isSmallScreen) return
+
+    autoFocusTriggeredRef.current = true
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const behavior: ScrollBehavior = prefersReducedMotion ? 'auto' : 'smooth'
+    el.scrollIntoView({ behavior, block: 'start' })
+    if (el instanceof HTMLElement) {
+      el.focus({ preventScroll: true })
+    }
+  }, [showDetails, dobStr, expYears])
 
   useEffect(() => {
     if (!hasInteractedWithDob || !dobStr) return
@@ -295,6 +320,20 @@ export default function LifeClockApp() {
   const progressWidth = showDetails && stats ? `${stats.percent}%` : '0%'
   const displayedLivedWeeks = showDetails ? clamp(visibleWeeks, 0, totalWeeks) : 0
 
+  const reanimateWeeks = useCallback(() => {
+    if (!showDetails || !stats) return
+    const target = clamp(stats.livedWeeks, 0, stats.totalWeeks)
+    setVisibleWeeks(0)
+    visibleWeeksRef.current = 0
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(() => {
+        setVisibleWeeks(target)
+      })
+    } else {
+      setVisibleWeeks(target)
+    }
+  }, [showDetails, stats])
+
   return (
     <div className="min-h-screen w-full bg-slate-50 text-slate-900 p-6 md:p-10">
       <div className="max-w-5xl mx-auto">
@@ -353,7 +392,16 @@ export default function LifeClockApp() {
                   <button
                     key={b.label}
                     className="rounded-xl px-3 py-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 transition-colors"
-                    onClick={() => setExpYears(b.v)}
+                    onClick={() => {
+                      markDobInteraction()
+                      if (b.v === expYears) {
+                        reanimateWeeks()
+                      } else {
+                        setVisibleWeeks(0)
+                        visibleWeeksRef.current = 0
+                        setExpYears(b.v)
+                      }
+                    }}
                   >
                     {b.label}
                   </button>
@@ -372,7 +420,7 @@ export default function LifeClockApp() {
         </section>
 
         {showDetails && (
-          <>
+          <div ref={detailsSectionRef} tabIndex={-1}>
             <section className="grid md:grid-cols-4 gap-4 mb-6 life-fade-section" style={{ animationDelay: '0ms' }}>
               <div className="bg-white rounded-2xl shadow p-5">
                 <div className="text-sm text-slate-600">Vek</div>
@@ -434,7 +482,7 @@ export default function LifeClockApp() {
                 <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-slate-200 border border-slate-300" /> zostáva</div>
               </div>
             </section>
-          </>
+          </div>
         )}
       </div>
     </div>
