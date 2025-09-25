@@ -190,6 +190,7 @@ export default function LifeClockApp() {
   const [showDetails, setShowDetails] = useState(false)
   const [visibleWeeks, setVisibleWeeks] = useState(0)
   const visibleWeeksRef = useRef(0)
+  const weeksSectionRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     visibleWeeksRef.current = visibleWeeks
@@ -232,7 +233,15 @@ export default function LifeClockApp() {
 
   useEffect(() => {
     if (!showDetails) return
+    visibleWeeksRef.current = 0
     setVisibleWeeks(0)
+  }, [showDetails, dobStr, expYears])
+
+  useEffect(() => {
+    if (!showDetails) return
+    const el = weeksSectionRef.current
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [showDetails, dobStr, expYears])
 
   useEffect(() => {
@@ -353,7 +362,10 @@ export default function LifeClockApp() {
                   <button
                     key={b.label}
                     className="rounded-xl px-3 py-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 transition-colors"
-                    onClick={() => setExpYears(b.v)}
+                    onClick={() => {
+                      markDobInteraction()
+                      setExpYears(b.v)
+                    }}
                   >
                     {b.label}
                   </button>
@@ -408,7 +420,11 @@ export default function LifeClockApp() {
             </section>
 
             {/* Týždne života (vizualizácia) */}
-            <section className="bg-white rounded-2xl shadow p-6 mb-6 life-fade-section" style={{ animationDelay: '300ms' }}>
+            <section
+              ref={weeksSectionRef}
+              className="bg-white rounded-2xl shadow p-6 mb-6 life-fade-section"
+              style={{ animationDelay: '300ms' }}
+            >
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <div className="text-sm text-slate-600">Týždne života</div>
