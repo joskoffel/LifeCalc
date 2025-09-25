@@ -12,7 +12,19 @@ body {
 
 .life-week {
   border: 1px solid transparent;
-  transition: background-color 0.8s ease, border-color 0.8s ease, box-shadow 0.8s ease;
+  opacity: 0;
+  transform: scale(0.92);
+  transition:
+    opacity 1.2s ease,
+    transform 1.2s ease,
+    background-color 0.8s ease,
+    border-color 0.8s ease,
+    box-shadow 0.8s ease;
+}
+
+.life-week--slot-visible {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .life-week--filled {
@@ -35,4 +47,23 @@ body {
 .dark .life-week--empty {
   background-color: rgba(148, 163, 184, 0.22);
   border-color: rgba(148, 163, 184, 0.35);
+}
+
+.life-grid-wrapper {
+  opacity: 0;
+  transition: opacity 1.4s ease;
+}
+
+.life-grid--revealing {
+  opacity: 1;
+}
+
+.life-grid {
+  opacity: 0;
+  transition: opacity 1.4s ease;
+}
+
+.life-grid--revealing .life-grid,
+.life-grid--ready .life-grid {
+  opacity: 1;
 }
